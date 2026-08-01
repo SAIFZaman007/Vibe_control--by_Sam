@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { errorMessage } from "../api/client";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, resendOtp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/studio";
@@ -23,6 +23,19 @@ export default function Login() {
       await login(email, password);
       navigate(redirectTo, { replace: true });
     } catch (err) {
+      // Unverified accounts get routed to the OTP screen (a code is re-sent).
+      if (
+        err?.response?.status === 403 &&
+        err?.response?.data?.detail === "EMAIL_NOT_VERIFIED"
+      ) {
+        try {
+          await resendOtp(email);
+        } catch {
+          /* ignore — the screen has its own resend button */
+        }
+        navigate("/verify-otp", { state: { email } });
+        return;
+      }
       setError(errorMessage(err, "Could not log in. Check your details and try again."));
     } finally {
       setBusy(false);

@@ -24,7 +24,8 @@ export default function Register() {
     setBusy(true);
     try {
       await register(fullName, email, password);
-      navigate("/studio", { replace: true });
+      // Move to the OTP screen — a 6-digit code was just emailed.
+      navigate("/verify-otp", { state: { email } });
     } catch (err) {
       setError(errorMessage(err, "Could not create your account. Try a different email."));
     } finally {

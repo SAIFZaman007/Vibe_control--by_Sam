@@ -42,14 +42,27 @@ export function AuthProvider({ children }) {
     await loadUser();
   };
 
+  // Registration now starts email verification instead of logging in directly.
+  // Returns { message, email } so the caller can move to the OTP screen.
   const register = async (fullName, email, password) => {
-    await api.post("/api/auth/register", {
+    const { data } = await api.post("/api/auth/register", {
       full_name: fullName,
       email,
       password,
     });
-    // Auto-login right after successful registration.
-    await login(email, password);
+    return data;
+  };
+
+  // Verify the 6-digit code. On success the backend returns an access token,
+  // which logs the user in automatically.
+  const verifyOtp = async (email, code) => {
+    const { data } = await api.post("/api/auth/verify-otp", { email, code });
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    await loadUser();
+  };
+
+  const resendOtp = async (email) => {
+    await api.post("/api/auth/resend-otp", { email });
   };
 
   const logout = () => {
@@ -57,7 +70,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const value = { user, setUser, loading, login, register, logout, reload: loadUser };
+  const value = {
+    user,
+    setUser,
+    loading,
+    login,
+    register,
+    verifyOtp,
+    resendOtp,
+    logout,
+    reload: loadUser,
+  };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

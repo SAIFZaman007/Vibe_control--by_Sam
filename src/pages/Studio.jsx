@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { UploadCloud, ImagePlus, Wand2, Download, RotateCcw, X } from "lucide-react";
+import { UploadCloud, ImagePlus, Wand2, Download, RotateCcw, X, Film } from "lucide-react";
 import { api, errorMessage } from "../api/client";
 import StyleCard from "../components/StyleCard";
 import CompareSlider from "../components/CompareSlider";
 import AuthImage from "../components/AuthImage";
+import AuthVideo from "../components/AuthVideo";
 
-const MAX_MB = 15;
-const ACCEPT = "image/jpeg,image/png,image/webp";
+const MAX_IMAGE_MB = 15;
+const MAX_VIDEO_MB = 50;
+const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
+const VIDEO_ACCEPT = "video/mp4,video/quicktime,video/webm";
+const CONTENT_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
 
-function Dropzone({ label, hint, previewUrl, onFile, onClear, icon: Icon }) {
+function Dropzone({ label, hint, previewUrl, onFile, onClear, icon: Icon, accept = IMAGE_ACCEPT, isVideo = false }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
 
@@ -27,11 +31,15 @@ function Dropzone({ label, hint, previewUrl, onFile, onClear, icon: Icon }) {
     >
       {previewUrl ? (
         <>
-          <img src={previewUrl} alt="Selected preview" className="max-h-40 rounded-xl object-contain" />
+          {isVideo ? (
+            <video src={previewUrl} className="max-h-40 rounded-xl" controls muted playsInline />
+          ) : (
+            <img src={previewUrl} alt="Selected preview" className="max-h-40 rounded-xl object-contain" />
+          )}
           <button
             type="button" onClick={onClear}
             className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white text-ink shadow hover:bg-canvas"
-            aria-label="Remove image"
+            aria-label="Remove file"
           >
             <X size={15} />
           </button>
@@ -46,7 +54,7 @@ function Dropzone({ label, hint, previewUrl, onFile, onClear, icon: Icon }) {
         </button>
       )}
       <input
-        ref={inputRef} type="file" accept={ACCEPT} className="hidden"
+        ref={inputRef} type="file" accept={accept} className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
       />
     </div>
@@ -59,6 +67,7 @@ export default function Studio() {
 
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [fileIsVideo, setFileIsVideo] = useState(false);
 
   const [styleKey, setStyleKey] = useState(null);
   const [customFile, setCustomFile] = useState(null);
@@ -66,6 +75,7 @@ export default function Studio() {
 
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState(null);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
 
@@ -79,12 +89,15 @@ export default function Studio() {
 
   // Manage object URLs for previews.
   const selectContent = useCallback((f) => {
-    if (f.size > MAX_MB * 1024 * 1024) {
-      setError(`Image is too large (max ${MAX_MB} MB).`);
+    const isVid = f.type.startsWith("video/");
+    const capMb = isVid ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+    if (f.size > capMb * 1024 * 1024) {
+      setError(`${isVid ? "Video" : "Image"} is too large (max ${capMb} MB).`);
       return;
     }
     setError("");
     setResult(null);
+    setFileIsVideo(isVid);
     setFile(f);
     setFilePreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f); });
   }, []);
@@ -97,7 +110,7 @@ export default function Studio() {
 
   const clearContent = () => {
     if (filePreview) URL.revokeObjectURL(filePreview);
-    setFile(null); setFilePreview(null); setResult(null);
+    setFile(null); setFilePreview(null); setFileIsVideo(false); setResult(null);
   };
   const clearCustom = () => {
     if (customPreview) URL.revokeObjectURL(customPreview);
@@ -136,6 +149,7 @@ export default function Studio() {
   const applyVibe = async () => {
     if (!canSubmit) return;
     setBusy(true);
+    setUploadPct(0);
     setError("");
     setResult(null);
     try {
@@ -147,12 +161,16 @@ export default function Studio() {
 
       const { data } = await api.post("/api/images/stylize", form, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e) => {
+          if (e.total) setUploadPct(Math.round((e.loaded / e.total) * 100));
+        },
       });
       setResult(data);
     } catch (err) {
-      setError(errorMessage(err, "Style transfer failed. Try another image."));
+      setError(errorMessage(err, "Style transfer failed. Try another file."));
     } finally {
       setBusy(false);
+      setUploadPct(null);
     }
   };
 
@@ -162,7 +180,8 @@ export default function Studio() {
     const url = URL.createObjectURL(res.data);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vibe-control-${result.style_key}-${result.id}.jpg`;
+    const ext = result.media_type === "video" ? "mp4" : "jpg";
+    a.download = `vibe-control-${result.style_key}-${result.id}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -175,11 +194,17 @@ export default function Studio() {
     setError("");
   };
 
+  // Busy label: show upload progress first, then the "restyling" phase.
+  const busyLabel =
+    uploadPct !== null && uploadPct < 100
+      ? `Uploading… ${uploadPct}%`
+      : `Restyling your ${fileIsVideo ? "video" : "photo"}…`;
+
   return (
     <div className="container-page py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold">Studio</h1>
-        <p className="mt-1 text-muted">Upload a photo, choose a vibe, and make it art.</p>
+        <p className="mt-1 text-muted">Upload a photo or video, choose a vibe, and make it art.</p>
       </div>
 
       {error && (
@@ -192,11 +217,11 @@ export default function Studio() {
         {/* Controls */}
         <div className="space-y-6">
           <section className="card p-5">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">1 · Your photo</h2>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">1 · Your media</h2>
             <Dropzone
-              label="Upload a photo" hint="JPG, PNG or WebP · up to 15 MB"
+              label="Upload a photo or video" hint="Image or MP4 · up to 50 MB"
               previewUrl={filePreview} onFile={selectContent} onClear={clearContent}
-              icon={UploadCloud}
+              icon={UploadCloud} accept={CONTENT_ACCEPT} isVideo={fileIsVideo}
             />
           </section>
 
@@ -224,7 +249,7 @@ export default function Studio() {
                 <Dropzone
                   label="Upload a style image" hint="We'll transfer its colors & texture"
                   previewUrl={customPreview} onFile={selectCustom} onClear={clearCustom}
-                  icon={ImagePlus}
+                  icon={ImagePlus} accept={IMAGE_ACCEPT} isVideo={false}
                 />
               </div>
             </div>
@@ -239,13 +264,14 @@ export default function Studio() {
             />
             <button onClick={applyVibe} disabled={!canSubmit} className="btn-primary mt-4 w-full text-base">
               {busy ? (
-                <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Applying vibe…</>
+                <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> {busyLabel}</>
               ) : (
                 <><Wand2 size={18} /> Apply vibe</>
               )}
             </button>
-            {!file && <p className="mt-2 text-center text-xs text-muted">Upload a photo to begin.</p>}
+            {!file && <p className="mt-2 text-center text-xs text-muted">Upload a photo or video to begin.</p>}
             {file && !styleKey && <p className="mt-2 text-center text-xs text-muted">Choose a vibe to continue.</p>}
+            {fileIsVideo && <p className="mt-2 text-center text-xs text-muted">Videos are processed frame-by-frame — longer clips take a little longer.</p>}
           </section>
         </div>
 
@@ -256,12 +282,20 @@ export default function Studio() {
 
             {result ? (
               <div className="space-y-4 animate-fade-up">
-                <CompareSlider
-                  before={<img src={filePreview} alt="Original" className="h-full w-full object-cover" />}
-                  after={<AuthImage path={result.output_url} alt="Stylized" className="h-full w-full object-cover" />}
-                />
+                {result.media_type === "video" ? (
+                  <div className="overflow-hidden rounded-2xl bg-black">
+                    <AuthVideo path={result.output_url} className="w-full" controls />
+                  </div>
+                ) : (
+                  <CompareSlider
+                    before={<img src={filePreview} alt="Original" className="h-full w-full object-cover" />}
+                    after={<AuthImage path={result.output_url} alt="Stylized" className="h-full w-full object-cover" />}
+                  />
+                )}
                 <p className="text-sm text-muted">
-                  Drag the handle to compare. Saved to your{" "}
+                  {result.media_type === "video"
+                    ? "Your stylized video with its original audio. Saved to your "
+                    : "Drag the handle to compare. Saved to your "}
                   <span className="font-semibold text-ink">Gallery</span>.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -277,14 +311,14 @@ export default function Studio() {
               <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-canvas">
                 <div className="text-center">
                   <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-line border-t-vibe" />
-                  <p className="mt-3 text-sm text-muted">Restyling your photo…</p>
+                  <p className="mt-3 text-sm text-muted">{busyLabel}</p>
                 </div>
               </div>
             ) : (
               <div className="grid aspect-[4/3] place-items-center rounded-2xl border border-dashed border-line bg-canvas">
                 <div className="px-6 text-center text-muted">
-                  <Wand2 className="mx-auto mb-2 opacity-40" size={28} />
-                  <p className="text-sm">Your restyled image will appear here.</p>
+                  <Film className="mx-auto mb-2 opacity-40" size={28} />
+                  <p className="text-sm">Your restyled image or video will appear here.</p>
                 </div>
               </div>
             )}

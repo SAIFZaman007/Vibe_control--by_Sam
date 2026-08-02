@@ -26,7 +26,7 @@ function Hero({ styles }) {
             <span className="text-vibe-gradient">whole new vibe.</span>
           </h1>
           <p className="mt-5 max-w-md text-lg text-muted">
-            Upload an image, pick a vibe, and let open-source AI restyle it in seconds.
+            Upload an image or a video, pick a vibe, and let open-source AI restyle it in seconds.
             Save the looks you love and download in full resolution.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -69,7 +69,7 @@ function Hero({ styles }) {
 }
 
 const STEPS = [
-  { icon: Upload, title: "Upload a photo", body: "Drop in any JPG, PNG, or WebP up to 15 MB." },
+  { icon: Upload, title: "Upload a photo or video", body: "Drop in any JPG, PNG, or MP4 up to 100 MB and 60 seconds." },
   { icon: Wand2, title: "Pick a vibe", body: "Choose a built-in style — or upload your own to transfer." },
   { icon: Download, title: "Download the result", body: "Preview before and after, then save in high resolution." },
 ];

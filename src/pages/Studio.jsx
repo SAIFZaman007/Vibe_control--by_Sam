@@ -118,10 +118,24 @@ export default function Studio() {
     if (styleKey === "custom") setStyleKey(null);
   };
 
-  useEffect(() => () => {
-    if (filePreview) URL.revokeObjectURL(filePreview);
-    if (customPreview) URL.revokeObjectURL(customPreview);
-  }, [filePreview, customPreview]);
+  // Revoke each object URL only when THAT url itself changes (or on unmount).
+  // These must be two separate effects: a single effect keyed on both
+  // [filePreview, customPreview] would revoke BOTH urls whenever either one
+  // changed (its cleanup closure captures both), which meant picking a custom
+  // style image after already uploading a photo silently killed the photo's
+  // preview blob — that's what was breaking the "before" side of the compare
+  // slider. Scoping each effect to its own single dependency fixes that.
+  useEffect(() => {
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview);
+    };
+  }, [filePreview]);
+
+  useEffect(() => {
+    return () => {
+      if (customPreview) URL.revokeObjectURL(customPreview);
+    };
+  }, [customPreview]);
 
   const toggleFavorite = async (key) => {
     const isFav = favorites.has(key);

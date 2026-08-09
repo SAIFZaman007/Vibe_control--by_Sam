@@ -19,14 +19,14 @@ function Hero({ styles }) {
       <div className="container-page grid items-center gap-12 py-16 lg:grid-cols-2 lg:py-24">
         <div className="animate-fade-up">
           <span className="eyebrow">
-            <Sparkles size={13} className="text-vibe" /> AI style studio
+            <Sparkles size={13} className="text-vibe" /> Style studio
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] sm:text-5xl lg:text-6xl">
             Give any photo a<br />
             <span className="text-vibe-gradient">whole new vibe.</span>
           </h1>
           <p className="mt-5 max-w-md text-lg text-muted">
-            Upload an image or a video, pick a vibe, and let open-source AI restyle it in seconds.
+            Upload an image or a video, pick a vibe, and restyle it in seconds.
             Save the looks you love and download in full resolution.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { UploadCloud, ImagePlus, Wand2, Download, RotateCcw, X, Film } from "lucide-react";
+import { UploadCloud, ImagePlus, Wand2, Download, RotateCcw, X, Film, Heart } from "lucide-react";
 import { api, errorMessage } from "../api/client";
 import StyleCard from "../components/StyleCard";
 import CompareSlider from "../components/CompareSlider";
@@ -208,6 +208,22 @@ export default function Studio() {
     setError("");
   };
 
+  // Favorite the *result itself* (not the vibe used to make it) — this is
+  // separate from the heart on each StyleCard above, which bookmarks a vibe
+  // for next time. It's the only way to save a "transfer your own style"
+  // result, since custom styles aren't in the preset catalog to favorite.
+  const toggleResultFavorite = async () => {
+    if (!result) return;
+    const next = !result.is_favorite;
+    setResult((r) => ({ ...r, is_favorite: next })); // optimistic
+    try {
+      if (next) await api.post(`/api/images/${result.id}/favorite`);
+      else await api.delete(`/api/images/${result.id}/favorite`);
+    } catch {
+      setResult((r) => ({ ...r, is_favorite: !next })); // revert on failure
+    }
+  };
+
   // Busy label: show upload progress first, then the "restyling" phase.
   const busyLabel =
     uploadPct !== null && uploadPct < 100
@@ -320,6 +336,13 @@ export default function Studio() {
                     <RotateCcw size={16} /> New
                   </button>
                 </div>
+                <button
+                  onClick={toggleResultFavorite}
+                  className={`btn-ghost w-full ${result.is_favorite ? "border-pulse/40 bg-pulse/5 text-pulse" : ""}`}
+                >
+                  <Heart size={16} className={result.is_favorite ? "fill-pulse text-pulse" : ""} />
+                  {result.is_favorite ? "Added to favorites" : "Add to favorites"}
+                </button>
               </div>
             ) : busy ? (
               <div className="grid aspect-[4/3] place-items-center rounded-2xl bg-canvas">

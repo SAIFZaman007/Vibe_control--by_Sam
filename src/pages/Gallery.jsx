@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, Trash2, ImageOff, Plus, Film } from "lucide-react";
+import { Download, Trash2, ImageOff, Plus, Film, Heart } from "lucide-react";
 import { api } from "../api/client";
 import AuthImage from "../components/AuthImage";
 import AuthVideo from "../components/AuthVideo";
@@ -16,6 +16,7 @@ function formatDate(iso) {
 export default function Gallery() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -36,6 +37,19 @@ export default function Gallery() {
     }
   };
 
+  const toggleFavorite = async (img) => {
+    const next = !img.is_favorite;
+    setImages((prev) => prev.map((i) => (i.id === img.id ? { ...i, is_favorite: next } : i)));
+    try {
+      if (next) await api.post(`/api/images/${img.id}/favorite`);
+      else await api.delete(`/api/images/${img.id}/favorite`);
+    } catch {
+      setImages((prev) => prev.map((i) => (i.id === img.id ? { ...i, is_favorite: !next } : i)));
+    }
+  };
+
+  const visibleImages = favoritesOnly ? images.filter((i) => i.is_favorite) : images;
+
   const download = async (img) => {
     const res = await api.get(`${img.output_url}&download=true`, { responseType: "blob" });
     const url = URL.createObjectURL(res.data);
@@ -49,14 +63,26 @@ export default function Gallery() {
 
   return (
     <div className="container-page py-10">
-      <div className="mb-8 flex items-end justify-between gap-4">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">Gallery</h1>
           <p className="mt-1 text-muted">Everything you've created, in one place.</p>
         </div>
-        <Link to="/studio" className="btn-primary shrink-0">
-          <Plus size={18} /> New creation
-        </Link>
+        <div className="flex items-center gap-2">
+          {images.length > 0 && (
+            <button
+              onClick={() => setFavoritesOnly((v) => !v)}
+              className={favoritesOnly ? "btn-subtle" : "btn-ghost"}
+              aria-pressed={favoritesOnly}
+            >
+              <Heart size={16} className={favoritesOnly ? "fill-pulse text-pulse" : ""} />
+              Favorites
+            </button>
+          )}
+          <Link to="/studio" className="btn-primary shrink-0">
+            <Plus size={18} /> New creation
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -74,9 +100,20 @@ export default function Gallery() {
           </p>
           <Link to="/studio" className="btn-primary mt-6">Open studio</Link>
         </div>
+      ) : visibleImages.length === 0 ? (
+        <div className="card grid place-items-center py-20 text-center">
+          <Heart className="mb-3 text-muted opacity-40" size={40} />
+          <h2 className="text-lg font-bold">No favorites yet</h2>
+          <p className="mt-1 max-w-sm text-sm text-muted">
+            Tap the heart on a creation to save it here.
+          </p>
+          <button onClick={() => setFavoritesOnly(false)} className="btn-primary mt-6">
+            Show everything
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
-          {images.map((img) => {
+          {visibleImages.map((img) => {
             const isVideo = img.media_type === "video";
             return (
               <div key={img.id} className="card group overflow-hidden">
@@ -91,12 +128,24 @@ export default function Gallery() {
                       <Film size={11} /> Video
                     </span>
                   )}
+                  {img.is_favorite && (
+                    <span className="pointer-events-none absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white/90 shadow">
+                      <Heart size={13} className="fill-pulse text-pulse" />
+                    </span>
+                  )}
                   <div
                     className={`pointer-events-none absolute inset-0 flex gap-2 p-3 opacity-0 transition group-hover:opacity-100
                       ${isVideo
                         ? "items-start justify-end bg-gradient-to-b from-ink/60 via-transparent"
                         : "items-end justify-center bg-gradient-to-t from-ink/70 via-transparent"}`}
                   >
+                    <button
+                      onClick={() => toggleFavorite(img)}
+                      className="pointer-events-auto btn bg-white px-3 py-2 text-ink hover:bg-canvas"
+                      aria-label={img.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Heart size={16} className={img.is_favorite ? "fill-pulse text-pulse" : ""} />
+                    </button>
                     <button
                       onClick={() => download(img)}
                       className="pointer-events-auto btn bg-white px-3 py-2 text-ink hover:bg-canvas"

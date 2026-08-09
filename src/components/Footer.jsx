@@ -9,11 +9,11 @@ export default function Footer() {
             <Sparkles size={12} />
           </span>
           <span>
-            <span className="font-semibold text-ink">Vibe Control</span> — AI style studio
+            <span className="font-semibold text-ink">Vibe Control</span> — style studio
           </span>
         </div>
         <p className="text-xs text-muted">
-          Built with React &amp; FastAPI · Style transfer runs on open-source AI models.
+          Built with React &amp; FastAPI · Style transfer runs on open-source tooling.
         </p>
       </div>
     </footer>

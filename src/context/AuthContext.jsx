@@ -64,6 +64,15 @@ export function AuthProvider({ children }) {
   const resendOtp = async (email) => {
     await api.post("/api/auth/resend-otp", { email });
   };
+  
+  const forgotPassword = async (email) => {
+    const { data } = await api.post("/api/auth/forgot-password", { email });
+    return data;
+  };
+
+  const resetPassword = async (token, newPassword) => {
+    await api.post("/api/auth/reset-password", { token, new_password: newPassword });
+  }
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);

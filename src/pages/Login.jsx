@@ -9,6 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/studio";
+  const resetSuccess = location.state?.resetSuccess;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,6 +55,11 @@ export default function Login() {
         </div>
 
         <form onSubmit={submit} className="card space-y-4 p-6">
+          {resetSuccess && !error && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-600">
+              Your password has been updated. Log in with your new password.
+            </div>
+          )}
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-600">
               {error}
@@ -68,7 +74,12 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="label" htmlFor="password">Password</label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="label mb-0" htmlFor="password">Password</label>
+              <Link to="/forgot-password" className="text-xs font-semibold text-vibe hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password" type="password" required autoComplete="current-password"
               className="input" placeholder="••••••••"

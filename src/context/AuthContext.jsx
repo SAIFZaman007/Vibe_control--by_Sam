@@ -64,15 +64,19 @@ export function AuthProvider({ children }) {
   const resendOtp = async (email) => {
     await api.post("/api/auth/resend-otp", { email });
   };
-  
+
+  // Requests an emailed reset link. The backend always responds the same way,
+  // whether or not the email belongs to an account — nothing to branch on here.
   const forgotPassword = async (email) => {
     const { data } = await api.post("/api/auth/forgot-password", { email });
     return data;
   };
 
+  // Consumes the token from the emailed link and sets a new password. The
+  // caller is expected to log in again afterwards (no auto-login here).
   const resetPassword = async (token, newPassword) => {
     await api.post("/api/auth/reset-password", { token, new_password: newPassword });
-  }
+  };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
@@ -87,6 +91,8 @@ export function AuthProvider({ children }) {
     register,
     verifyOtp,
     resendOtp,
+    forgotPassword,
+    resetPassword,
     logout,
     reload: loadUser,
   };

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, TOKEN_KEY } from "../api/client";
+import { api, clearSession, getToken, storeSession } from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -7,10 +7,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load the current user whenever a token is present (e.g. on refresh).
+  // /api/users/me is used rather than /users/tokens/info because the latter
+  // omits is_active and is_admin.
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
+    if (!getToken()) {
       setUser(null);
       setLoading(false);
       return;
@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
       const { data } = await api.get("/api/users/me");
       setUser(data);
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
+      clearSession();
       setUser(null);
     } finally {
       setLoading(false);
@@ -31,55 +31,43 @@ export function AuthProvider({ children }) {
   }, [loadUser]);
 
   const login = async (email, password) => {
-    // The token endpoint expects form-encoded OAuth2 fields.
-    const form = new URLSearchParams();
-    form.append("username", email);
-    form.append("password", password);
-    const { data } = await api.post("/api/auth/login", form, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    const { data } = await api.post("/users/tokens/sign_in", { email, password });
+    storeSession(data);
     await loadUser();
   };
 
-  // Registration now starts email verification instead of logging in directly.
-  // Returns { message, email } so the caller can move to the OTP screen.
+  // Registration signs the user straight in — there is no verification step.
   const register = async (fullName, email, password) => {
-    const { data } = await api.post("/api/auth/register", {
+    const { data } = await api.post("/users/tokens/sign_up", {
       full_name: fullName,
       email,
       password,
+      password_confirmation: password,
     });
-    return data;
-  };
-
-  // Verify the 6-digit code. On success the backend returns an access token,
-  // which logs the user in automatically.
-  const verifyOtp = async (email, code) => {
-    const { data } = await api.post("/api/auth/verify-otp", { email, code });
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    storeSession(data);
     await loadUser();
-  };
-
-  const resendOtp = async (email) => {
-    await api.post("/api/auth/resend-otp", { email });
-  };
-
-  // Requests an emailed reset link. The backend always responds the same way,
-  // whether or not the email belongs to an account — nothing to branch on here.
-  const forgotPassword = async (email) => {
-    const { data } = await api.post("/api/auth/forgot-password", { email });
     return data;
   };
 
-  // Consumes the token from the emailed link and sets a new password. The
-  // caller is expected to log in again afterwards (no auto-login here).
-  const resetPassword = async (token, newPassword) => {
-    await api.post("/api/auth/reset-password", { token, new_password: newPassword });
+  // Answers 404 when no account matches, so callers must handle that.
+  const forgotPassword = async (email) => {
+    const { data } = await api.post("/passwords/forgot", { email });
+    return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+  const resetPassword = async (token, newPassword) => {
+    await api.post("/passwords/reset", { token, password: newPassword });
+  };
+
+  const logout = async () => {
+    // Revoke server-side so the token dies immediately. A failure here still
+    // clears the client.
+    try {
+      await api.post("/users/tokens/revoke");
+    } catch {
+      // Already revoked or offline — nothing useful to do.
+    }
+    clearSession();
     setUser(null);
   };
 
@@ -89,8 +77,6 @@ export function AuthProvider({ children }) {
     loading,
     login,
     register,
-    verifyOtp,
-    resendOtp,
     forgotPassword,
     resetPassword,
     logout,

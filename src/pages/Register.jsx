@@ -17,17 +17,20 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Devise is configured for 8..128; catching it here saves a round trip.
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
     }
+
     setBusy(true);
     try {
+      // Sign-up returns a session, so there's no verification step to visit.
       await register(fullName, email, password);
-      // Move to the OTP screen — a 6-digit code was just emailed.
-      navigate("/verify-otp", { state: { email } });
+      navigate("/studio", { replace: true });
     } catch (err) {
-      setError(errorMessage(err, "Could not create your account. Try a different email."));
+      setError(errorMessage(err, "Could not create your account. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -41,7 +44,7 @@ export default function Register() {
             <Sparkles size={18} />
           </span>
           <h1 className="mt-4 text-2xl font-extrabold">Create your account</h1>
-          <p className="mt-1 text-sm text-muted">Start restyling photos in under a minute.</p>
+          <p className="mt-1 text-sm text-muted">Start restyling your photos and clips.</p>
         </div>
 
         <form onSubmit={submit} className="card space-y-4 p-6">
@@ -51,10 +54,10 @@ export default function Register() {
             </div>
           )}
           <div>
-            <label className="label" htmlFor="name">Full name</label>
+            <label className="label" htmlFor="fullName">Full name</label>
             <input
-              id="name" type="text" required autoComplete="name"
-              className="input" placeholder="Alex Rivera"
+              id="fullName" type="text" required autoComplete="name"
+              className="input" placeholder="Ada Lovelace"
               value={fullName} onChange={(e) => setFullName(e.target.value)}
             />
           </div>
@@ -70,7 +73,7 @@ export default function Register() {
             <label className="label" htmlFor="password">Password</label>
             <input
               id="password" type="password" required autoComplete="new-password"
-              minLength={8} className="input" placeholder="At least 8 characters"
+              className="input" placeholder="At least 8 characters"
               value={password} onChange={(e) => setPassword(e.target.value)}
             />
           </div>

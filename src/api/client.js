@@ -1,41 +1,94 @@
 import axios from "axios";
 
-// Base URL: empty in development (Vite proxies /api to the backend). In
-// production, set VITE_API_URL to the API origin, e.g. https://api.yoursite.com
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 export const TOKEN_KEY = "vibe_token";
+export const REFRESH_TOKEN_KEY = "vibe_refresh_token";
 
 export const api = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach the bearer token to every request if the user is logged in.
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const getRefreshToken = () => localStorage.getItem(REFRESH_TOKEN_KEY);
+
+export function storeSession(data) {
+  if (data?.token) localStorage.setItem(TOKEN_KEY, data.token);
+  if (data?.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = getToken();
+  if (token && !config.skipAuth) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
-// On 401, clear the token so the UI can redirect to login.
+
+let refreshPromise = null;
+
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) throw new Error("No refresh token");
+
+  const { data } = await api.post("/users/tokens/refresh", null, {
+    skipAuth: true,
+    headers: { Authorization: `Bearer ${refreshToken}` },
+  });
+
+  storeSession(data);
+  return data.token;
+}
+
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+  async (error) => {
+    const original = error.config;
+    const status = error.response?.status;
+
+    if (status !== 401 || !original || original._retried || original.skipAuth) {
+      if (status === 401) clearSession();
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    if (original.url?.includes("/users/tokens/refresh")) {
+      clearSession();
+      return Promise.reject(error);
+    }
+
+    original._retried = true;
+
+    try {
+      refreshPromise = refreshPromise || refreshAccessToken();
+      const newToken = await refreshPromise;
+      original.headers.Authorization = `Bearer ${newToken}`;
+      return api(original);
+    } catch (refreshError) {
+      clearSession();
+      return Promise.reject(refreshError);
+    } finally {
+      refreshPromise = null;
+    }
   }
 );
 
-// Build a full URL for public assets (style thumbnails) served by the backend.
 export const assetUrl = (path) => `${API_URL}${path}`;
 
-// Pull a human-readable message out of a FastAPI error response.
 export function errorMessage(error, fallback = "Something went wrong.") {
-  const detail = error?.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
+  const data = error?.response?.data;
+
+  if (Array.isArray(data?.error_description) && data.error_description[0]) {
+    return data.error_description[0];
+  }
+  if (typeof data?.error === "string") return data.error;
+  if (Array.isArray(data?.error) && data.error[0]) return data.error[0];
+
   return fallback;
 }

@@ -8,8 +8,8 @@ export default function ForgotPassword() {
   const { forgotPassword } = useAuth();
 
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
@@ -18,11 +18,15 @@ export default function ForgotPassword() {
     setBusy(true);
     try {
       await forgotPassword(email);
-      // Always show the same confirmation, whether or not the email exists —
-      // the backend response is identical either way.
       setSent(true);
     } catch (err) {
-      setError(errorMessage(err, "Could not send a reset link. Please try again."));
+      // The backend answers 404 when no account matches, so unlike a
+      // enumeration-safe API this has to be shown rather than swallowed.
+      if (err?.response?.status === 404) {
+        setError("We couldn't find an account with that email address.");
+      } else {
+        setError(errorMessage(err, "Could not send the reset link. Please try again."));
+      }
     } finally {
       setBusy(false);
     }
@@ -35,28 +39,20 @@ export default function ForgotPassword() {
           <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-vibe-gradient text-white">
             <KeyRound size={18} />
           </span>
-          <h1 className="mt-4 text-2xl font-extrabold">Reset your password</h1>
+          <h1 className="mt-4 text-2xl font-extrabold">Forgot your password?</h1>
           <p className="mt-1 text-sm text-muted">
-            Enter your email and we'll send you a link to choose a new one.
+            Enter your email and we'll send you a link to set a new one.
           </p>
         </div>
 
         {sent ? (
-          <div className="card p-6 text-center">
+          <div className="card space-y-4 p-6 text-center">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-600">
-              If an account exists for <span className="font-semibold">{email}</span>, a reset
-              link is on its way.
+              Check your inbox — we've sent you a reset link. It expires in 4 hours.
             </div>
-            <p className="mt-4 text-sm text-muted">
-              Didn't get it? Check your spam folder, or{" "}
-              <button
-                onClick={() => setSent(false)}
-                className="font-semibold text-vibe hover:underline"
-              >
-                try again
-              </button>
-              .
-            </p>
+            <Link to="/login" className="btn-primary inline-block w-full">
+              Back to login
+            </Link>
           </div>
         ) : (
           <form onSubmit={submit} className="card space-y-4 p-6">
@@ -82,7 +78,7 @@ export default function ForgotPassword() {
         <p className="mt-5 text-center text-sm text-muted">
           Remembered it?{" "}
           <Link to="/login" className="font-semibold text-vibe hover:underline">
-            Back to log in
+            Log in
           </Link>
         </p>
       </div>
